@@ -60,7 +60,7 @@ public class UserController {
         var user=userMapper.toEntity(registerUserRequest);
         userRepository.save(user);
         var userDto=userMapper.toDto(user);
-       // uricomponentsBuilder.path("/users/{id}").buildAndExpand(userDto.getId()).toUri();
+
 
         return ResponseEntity.ok(userDto);
 
