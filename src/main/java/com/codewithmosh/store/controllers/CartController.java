@@ -70,4 +70,43 @@ public class CartController {
         return ResponseEntity.status(HttpStatus.CREATED).body(cartItemDto);
 
     }
+    @GetMapping("/{cartId}")
+    public ResponseEntity<CartDto> getCart(@PathVariable UUID cartId)
+    {
+        var cart=cartRepository.findById(cartId).orElse(null);
+        if(cart==null)
+        {
+            return  ResponseEntity.notFound().build();
+        }
+        var cartDto=cartMapper.toDto(cart);
+        return ResponseEntity.status(HttpStatus.OK).body(cartDto);
+    }
+    @DeleteMapping("/{cardId}/items/{productId}")
+    public ResponseEntity<Void> removeItem(@PathVariable("cardId") UUID cartId,@PathVariable("productId") Long productId)
+    {    var cart=cartRepository.findById(cartId).orElse(null);
+        if(cart==null)
+        {
+            return ResponseEntity.notFound().build();
+        }
+        var cartItem=  cart.getCartItems().stream().filter(item->item.getProduct().getId().equals(productId)).findFirst().orElse(null);
+        if(cartItem==null)
+        {
+            return ResponseEntity.notFound().build();
+        }
+        cart.getCartItems().remove(cartItem);
+        cartItem.setCart(null);
+        cartRepository.save(cart);
+        return ResponseEntity.noContent().build();
+    }
+    @DeleteMapping("/{cardId}/items")
+    public ResponseEntity<Void> clearCart(@PathVariable("cardId") UUID cartId) {
+        var cart = cartRepository.findById(cartId).orElse(null);
+        if (cart == null) {
+            return ResponseEntity.notFound().build();
+        }
+        cart.getCartItems().forEach(item -> item.setCart(null));
+        cart.getCartItems().clear();
+        cartRepository.save(cart);
+        return ResponseEntity.noContent().build();
+    }
 }
