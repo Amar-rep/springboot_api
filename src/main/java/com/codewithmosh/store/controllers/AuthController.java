@@ -1,37 +1,65 @@
 package com.codewithmosh.store.controllers;
 
+import com.codewithmosh.store.dtos.JwtResponse;
 import com.codewithmosh.store.dtos.LoginRequest;
+import com.codewithmosh.store.dtos.UserDto;
+import com.codewithmosh.store.mappers.UserMapper;
 import com.codewithmosh.store.repositories.UserRepository;
+import com.codewithmosh.store.services.JwtService;
 import jakarta.validation.Valid;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-@RestController("/auth")
-@Data
+@RestController
+@RequestMapping("/auth")
+@AllArgsConstructor
 public class AuthController {
+
+    private final AuthenticationManager authenticationManager;
+    private final JwtService jwtService;
     private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
-
-
+    private final UserMapper userMapper;
 
     @PostMapping("/login")
-    public ResponseEntity<Void> login(@Valid @RequestBody LoginRequest request)
+    public ResponseEntity<JwtResponse> login(@Valid @RequestBody LoginRequest request)
     {
-        var user=userRepository.findByEmail(request.getEmail()).orElse(null);
-        if(user==null)
-        {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        if(!passwordEncoder.matches(request.getPassword(),user.getPassword()))
-        {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        return ResponseEntity.status(HttpStatus.OK).build();
+        System.out.println(request.getEmail());
+      authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(request.getEmail(),request.getPassword()));
+        var user=userRepository.findByEmail(request.getEmail()).orElseThrow();
+      var token=jwtService.generateToken(user);
+
+        return ResponseEntity.ok(new JwtResponse(token));
+    }
+    @PostMapping("/validate")
+    public boolean validate(@RequestHeader("Authorization") String token)
+    {
+        System.out.println(token +"Validate called");
+        return jwtService.validateToken(token);
+    }
+    @GetMapping("/me")
+    public ResponseEntity<UserDto> me()
+    {
+         var auththentication= SecurityContextHolder.getContext().getAuthentication();
+         var userId=(Long)auththentication.getPrincipal();
+         var user=  userRepository.findById(userId).orElse(null);
+            if(user==null)
+            {
+                return ResponseEntity.notFound().build();
+            }
+            var userDto=userMapper.toDto(user);
+            return ResponseEntity.ok(userDto);
+    }
+    @ExceptionHandler(value = {BadCredentialsException.class})
+    public ResponseEntity<Void> handleBadCredentials()
+    {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
     }
 }
